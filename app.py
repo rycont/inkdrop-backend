@@ -73,4 +73,6 @@ class ReqBody(BaseModel):
 def inkdrop_api(
     body: ReqBody
 ):
-    return inkdrop_to_image(body.lightness)
+    res = inkdrop_to_image(np.array(body.lightness))
+    print(res)
+    return res
