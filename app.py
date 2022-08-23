@@ -1,8 +1,10 @@
-from pydantic import BaseModel
-from fastapi import FastAPI
+from fastapi import FastAPI, File
+from PIL import Image
+from io import BytesIO
 from tensorflow import keras
-from typing import List
 import numpy as np
+from fastapi.middleware.cors import CORSMiddleware
+from utils import rgb2hsl, hsl2rgb
 
 SIZE = 384
 STRIDE = 192
@@ -23,16 +25,16 @@ def lightness_to_hue(_image):
          : origin_shape[1]
     ]
 
-def inkdrop_to_image(_input_image):
-    input_image = _input_image.copy()
+def inkdrop_to_image(_lightness):
+    input_lightness = _lightness.copy()
 
-    if input_image.shape == (SIZE, SIZE):
-        return lightness_to_hue(input_image)
+    if input_lightness.shape == (SIZE, SIZE):
+        return lightness_to_hue(input_lightness)
 
-    elif input_image.shape[0] >= SIZE and input_image.shape[1] >= SIZE:
+    elif input_lightness.shape[0] >= SIZE and input_lightness.shape[1] >= SIZE:
         print("Working on")
-        width = input_image.shape[0]
-        height = input_image.shape[1]
+        width = input_lightness.shape[0]
+        height = input_lightness.shape[1]
 
         start_x = 0
         start_y = 0
@@ -42,7 +44,7 @@ def inkdrop_to_image(_input_image):
 
         while start_x < width:
             while start_y < height:
-                patch = input_image[
+                patch = input_lightness[
                     start_x : start_x + SIZE,
                     start_y : start_y + SIZE
                 ]
@@ -66,13 +68,24 @@ def inkdrop_to_image(_input_image):
 
 app = FastAPI()
 
-class ReqBody(BaseModel):
-    lightness: List[float]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_methods=['*'],
+    allow_headers=['*']
+)
 
-@app.post("/inkdrop")
+@app.post("/inkdrop/")
 def inkdrop_api(
-    body: ReqBody
+    picture: bytes = File()
 ):
-    res = inkdrop_to_image(np.array(body.lightness))
-    print(res)
-    return res
+    rgb = np.array(Image.open(BytesIO(picture)))[:,:,:3]
+    hsl = rgb2hsl(rgb)
+    
+    lightness = hsl[:,:,2]
+    hue = inkdrop_to_image(lightness)
+
+    hsl[:,:,0] = hue
+    sampled = hsl2rgb(hsl)
+
+    return hue
