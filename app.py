@@ -1,10 +1,17 @@
-from fastapi import FastAPI, File
-from PIL import Image
+import sys
 from io import BytesIO
+from fastapi import FastAPI, File
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
 from tensorflow import keras
 import numpy as np
-from fastapi.middleware.cors import CORSMiddleware
 from utils import rgb2hsl, hsl2rgb
+import json
+
+np.set_printoptions(
+    threshold = sys.maxsize,
+    suppress = True
+)
 
 SIZE = 384
 STRIDE = 192
@@ -31,7 +38,7 @@ def inkdrop_to_image(_lightness):
     if input_lightness.shape == (SIZE, SIZE):
         return lightness_to_hue(input_lightness)
 
-    elif input_lightness.shape[0] >= SIZE and input_lightness.shape[1] >= SIZE:
+    elif input_lightness.shape[0] >= SIZE or input_lightness.shape[1] >= SIZE:
         print("Working on")
         width = input_lightness.shape[0]
         height = input_lightness.shape[1]
@@ -83,9 +90,6 @@ def inkdrop_api(
     hsl = rgb2hsl(rgb)
     
     lightness = hsl[:,:,2]
-    hue = inkdrop_to_image(lightness)
+    hue = inkdrop_to_image(lightness).round(3)
 
-    hsl[:,:,0] = hue
-    sampled = hsl2rgb(hsl)
-
-    return hue
+    return json.dumps(hue.tolist())
